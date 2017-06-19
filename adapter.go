@@ -3,6 +3,7 @@ package ConsulAdapter
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/inconshreveable/log15"
 
@@ -42,46 +43,42 @@ func (a *DBAdapter) Get(key string) (*api.KVPair, *api.QueryMeta, error) {
 	return a.kv.Get(key, nil)
 }
 
-// func loadPolicyLine(line string, model model.Model) {
-// 	if line == "" {
-// 		return
-// 	}
+func loadPolicyLine(line string, model model.Model) {
+	if line == "" {
+		return
+	}
+	tokens := strings.Split(line, ", ")
+	key := tokens[0]
+	sec := key[:1]
+	model[sec][key].Policy = append(model[sec][key].Policy, tokens[1:])
+	fmt.Println(model)
+}
 
-// 	tokens := strings.Split(line, ", ")
-
-// 	key := tokens[0]
-// 	fmt.Println("key: ", key)
-// 	sec := key[:1]
-// 	fmt.Println("sec: ", sec)
-// 	model[sec][key].Policy = append(model[sec][key].Policy, tokens[1:])
-// 	fmt.Println(model)
-// }
-
-// LoadPolicy loads policy from database.
+// LoadPolicy loads policy from consul.
 func (a *DBAdapter) LoadPolicy(model model.Model) {
 	a.init()
 
-	for ptype, ast := range model["p"] {
-		for _, rule := range ast.Policy {
-			fmt.Println(ptype, " ", rule)
-		}
+	pairs, meta, err := a.kv.List("", nil)
+	for _, v := range pairs {
+
+		line := string(v.Value)
+		loadPolicyLine(line, model)
+	}
+	fmt.Println(meta.LastIndex)
+	if err != nil {
+		fmt.Println("List error API: ", err)
 	}
 
-	for ptype, ast := range model["g"] {
-		for _, rule := range ast.Policy {
-			fmt.Println(ptype, "  ", rule)
-		}
-	}
 }
 
 func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
-	line := "'" + ptype + "'"
+	line := ptype
 	fmt.Println(line)
 	for i := range rule {
-		line += ",'" + rule[i] + "'"
+		line += ", " + rule[i]
 	}
 	for i := 0; i < 4-len(rule); i++ {
-		line += ",''"
+		line += ","
 	}
 	fmt.Println(idx)
 	p := &api.KVPair{Key: ptype + strconv.Itoa(idx), Value: []byte(line)}
@@ -93,7 +90,7 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
 
 }
 
-// SavePolicy saves policy to database.
+// SavePolicy saves policy to consul.
 func (a *DBAdapter) SavePolicy(model model.Model) {
 	a.init()
 
