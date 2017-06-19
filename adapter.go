@@ -1,4 +1,4 @@
-package ConsulAdapter
+package consuladapter
 
 import (
 	"fmt"
