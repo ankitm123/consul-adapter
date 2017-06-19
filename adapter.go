@@ -77,9 +77,9 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
 	for i := range rule {
 		line += ", " + rule[i]
 	}
-	for i := 0; i < 4-len(rule); i++ {
-		line += ","
-	}
+	// for i := 0; i < 4-len(rule); i++ {
+	// 	line += ","
+	// }
 	fmt.Println(idx)
 	p := &api.KVPair{Key: ptype + strconv.Itoa(idx), Value: []byte(line)}
 	success, _, err := a.kv.CAS(p, nil)
