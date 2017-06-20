@@ -43,6 +43,16 @@ func (a *DBAdapter) Get(key string) (*api.KVPair, *api.QueryMeta, error) {
 	return a.kv.Get(key, nil)
 }
 
+//CAS - Check and set function returns true or false if the operation is successful
+func (a *DBAdapter) CAS(kvpair *api.KVPair) (bool, *api.WriteMeta, error) {
+	return a.kv.CAS(kvpair, nil)
+}
+
+// List is used to lookup all keys under a prefix
+func (a *DBAdapter) List(prefix string) (api.KVPairs, *api.QueryMeta, error) {
+	return a.kv.List(prefix, nil)
+}
+
 func loadPolicyLine(line string, model model.Model) {
 	if line == "" {
 		return
@@ -51,16 +61,14 @@ func loadPolicyLine(line string, model model.Model) {
 	key := tokens[0]
 	sec := key[:1]
 	model[sec][key].Policy = append(model[sec][key].Policy, tokens[1:])
-	fmt.Println(model)
 }
 
 // LoadPolicy loads policy from consul.
 func (a *DBAdapter) LoadPolicy(model model.Model) {
 	a.init()
 
-	pairs, meta, err := a.kv.List("", nil)
+	pairs, meta, err := a.List("")
 	for _, v := range pairs {
-
 		line := string(v.Value)
 		loadPolicyLine(line, model)
 	}
@@ -82,11 +90,13 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
 	// }
 	fmt.Println(idx)
 	p := &api.KVPair{Key: ptype + strconv.Itoa(idx), Value: []byte(line)}
-	success, _, err := a.kv.CAS(p, nil)
-	if err != nil {
-		fmt.Println(err)
+	if success, _, err := a.CAS(p); success {
+		if err != nil {
+			log15.Error("Check and Set failed for Consul KV", "Error", err)
+		}
+	} else {
+		log15.Error("Check and Set returned false for Consul KV", "Error", err)
 	}
-	fmt.Println("CAS operation: ", success)
 
 }
 
