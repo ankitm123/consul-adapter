@@ -1,6 +1,7 @@
 package consuladapter
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -23,12 +24,14 @@ func NewDBAdapter() *DBAdapter {
 	return &a
 }
 
-func (a *DBAdapter) init() {
+func (a *DBAdapter) init() error {
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		log15.Error("Could not return consul client", "Error", err)
+		return err
 	}
 	a.kv = client.KV()
+	return nil
 
 }
 
@@ -63,10 +66,17 @@ func loadPolicyLine(line string, model model.Model) {
 }
 
 // LoadPolicy loads policy from consul.
-func (a *DBAdapter) LoadPolicy(model model.Model) {
-	a.init()
-
+func (a *DBAdapter) LoadPolicy(model model.Model) error {
+	err := a.init()
+	if err != nil {
+		log15.Error("Could not initialize DBAdapter", "Error", err)
+		return err
+	}
 	pairs, meta, err := a.List("")
+	if err != nil {
+		log15.Error("Could not retreive list of key-value pairs", "Error", err)
+		return err
+	}
 	for _, v := range pairs {
 		line := string(v.Value)
 		loadPolicyLine(line, model)
@@ -75,12 +85,12 @@ func (a *DBAdapter) LoadPolicy(model model.Model) {
 	if err != nil {
 		fmt.Println("List error API: ", err)
 	}
-
+	return nil
 }
 
-func (a *DBAdapter) writePolicyLine(ptype string, rule []string) {
+func (a *DBAdapter) writePolicyLine(ptype string, rule []string) error {
 	line := ptype
-	fmt.Println(line)
+
 	for i := range rule {
 		line += ", " + rule[i]
 	}
@@ -90,31 +100,50 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string) {
 	_, meta, err := a.List("")
 	if err != nil {
 		log15.Error("Could not retrieve key-value pair", "Error", err)
+		return err
 	}
 	p := &api.KVPair{Key: ptype + strconv.FormatUint(meta.LastIndex, 10), Value: []byte(line)}
 	if success, _, err := a.CAS(p); success {
 		if err != nil {
 			log15.Error("Check and Set failed for Consul KV", "Error", err)
+			return err
 		}
 	} else {
+		err = errors.New("Check and set returned false for Consul KV")
 		log15.Error("Check and Set returned false for Consul KV", "Error", err)
+		return err
 	}
-
+	return nil
 }
 
 // SavePolicy saves policy to consul.
-func (a *DBAdapter) SavePolicy(model model.Model) {
-	a.init()
+func (a *DBAdapter) SavePolicy(model model.Model) error {
+	err := a.init()
+	if err != nil {
+		log15.Error("Could not initialize DBAdapter", "Error", err)
+		return err
+	}
 
+	//Loop over the policies
 	for ptype, ast := range model["p"] {
 		for _, rule := range ast.Policy {
-			a.writePolicyLine(ptype, rule)
+			err = a.writePolicyLine(ptype, rule)
+			if err != nil {
+				log15.Error("Error storing policy to consul KV store", "Error", err)
+				return err
+			}
 		}
 	}
 
+	//Loop over group to role mapping
 	for ptype, ast := range model["g"] {
 		for _, rule := range ast.Policy {
-			a.writePolicyLine(ptype, rule)
+			err = a.writePolicyLine(ptype, rule)
+			if err != nil {
+				log15.Error("Error storing policy to consul KV store", "Error", err)
+				return err
+			}
 		}
 	}
+	return nil
 }
