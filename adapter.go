@@ -5,10 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/inconshreveable/log15"
-
 	"github.com/casbin/casbin/model"
 	"github.com/hashicorp/consul/api"
+	"github.com/inconshreveable/log15"
 )
 
 // DBAdapter represents the database adapter for policy persistence, can load policy from database or save policy to database.
@@ -79,7 +78,7 @@ func (a *DBAdapter) LoadPolicy(model model.Model) {
 
 }
 
-func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
+func (a *DBAdapter) writePolicyLine(ptype string, rule []string) {
 	line := ptype
 	fmt.Println(line)
 	for i := range rule {
@@ -88,8 +87,11 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string, idx int) {
 	// for i := 0; i < 4-len(rule); i++ {
 	// 	line += ","
 	// }
-	fmt.Println(idx)
-	p := &api.KVPair{Key: ptype + strconv.Itoa(idx), Value: []byte(line)}
+	_, meta, err := a.List("")
+	if err != nil {
+		log15.Error("Could not retrieve key-value pair", "Error", err)
+	}
+	p := &api.KVPair{Key: ptype + strconv.FormatUint(meta.LastIndex, 10), Value: []byte(line)}
 	if success, _, err := a.CAS(p); success {
 		if err != nil {
 			log15.Error("Check and Set failed for Consul KV", "Error", err)
@@ -105,14 +107,14 @@ func (a *DBAdapter) SavePolicy(model model.Model) {
 	a.init()
 
 	for ptype, ast := range model["p"] {
-		for idx, rule := range ast.Policy {
-			a.writePolicyLine(ptype, rule, idx)
+		for _, rule := range ast.Policy {
+			a.writePolicyLine(ptype, rule)
 		}
 	}
 
 	for ptype, ast := range model["g"] {
-		for idx, rule := range ast.Policy {
-			a.writePolicyLine(ptype, rule, idx)
+		for _, rule := range ast.Policy {
+			a.writePolicyLine(ptype, rule)
 		}
 	}
 }
