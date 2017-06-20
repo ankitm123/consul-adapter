@@ -72,7 +72,7 @@ func (a *DBAdapter) LoadPolicy(model model.Model) error {
 		log15.Error("Could not initialize DBAdapter", "Error", err)
 		return err
 	}
-	pairs, meta, err := a.List("")
+	pairs, _, err := a.List("")
 	if err != nil {
 		log15.Error("Could not retreive list of key-value pairs", "Error", err)
 		return err
@@ -81,7 +81,7 @@ func (a *DBAdapter) LoadPolicy(model model.Model) error {
 		line := string(v.Value)
 		loadPolicyLine(line, model)
 	}
-	fmt.Println(meta.LastIndex)
+
 	if err != nil {
 		fmt.Println("List error API: ", err)
 	}

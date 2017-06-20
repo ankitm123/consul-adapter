@@ -11,7 +11,9 @@ import (
 )
 
 func main() {
-	// Initialize a consul adapter and use it in a Casbin enforcer:
+	//This is how it should ideally work:
+    // Initialize a consul adapter and use it in a Casbin enforcer:
+    
 	a := consuladapter.NewDBAdapter()
 	e := casbin.NewEnforcer("examples/rbac_model.conf", a)
 	
@@ -27,5 +29,14 @@ func main() {
 	
 	// Save the policy back to consul KV store.
 	e.SavePolicy()
+
+    //This is how it works now. We have a csv file which is read by the adpater using savepolicy
+    e := casbin.NewEnforcer("./rbac/rbac_model.conf", "./rbac/rbac_policy.csv")
+	//a := ConsulAdapter.NewDBAdapter()
+	a.SavePolicy(e.GetModel())
+	//a.LoadPolicy(e.GetModel())
+	e = casbin.NewEnforcer("./rbac/rbac_model.conf", a)
+
+	e.LoadPolicy()
 }
 ```
