@@ -17,22 +17,11 @@ type KVAdapter struct {
 }
 
 // NewKVAdapter is the constructor for KVAdapter.
-func NewKVAdapter() *KVAdapter {
+func NewKVAdapter(kv *api.KV) *KVAdapter {
 	a := KVAdapter{}
+	a.kv = kv
 
 	return &a
-}
-
-func (a *KVAdapter) init() error {
-	//Change to handle non-default port, probably have to use viper
-	client, err := api.NewClient(api.DefaultConfig())
-	if err != nil {
-		log15.Error("Could not return consul client", "Error", err)
-		return err
-	}
-	a.kv = client.KV()
-	return nil
-
 }
 
 //cas - Check and set function returns true or false if the operation is successful
@@ -56,16 +45,12 @@ func loadPolicyLine(line string, model model.Model) {
 }
 
 // LoadPolicy loads policy from consul.
-func (a *KVAdapter) LoadPolicy(model model.Model) error {
-	// err := a.init()
-	// if err != nil {
-	// 	log15.Error("Could not initialize KVAdapter", "Error", err)
-	// 	return err
-	// }
+func (a *KVAdapter) LoadPolicy(model model.Model) {
+
 	pairs, _, err := a.list("rp")
 	if err != nil {
 		log15.Error("Could not retreive list of key-value pairs", "Error", err)
-		return err
+		//return err
 	}
 	for _, v := range pairs {
 		line := string(v.Value)
@@ -75,7 +60,7 @@ func (a *KVAdapter) LoadPolicy(model model.Model) error {
 	if err != nil {
 
 	}
-	return nil
+	//return nil
 }
 
 func (a *KVAdapter) writePolicyLine(ptype string, rule []string) error {
@@ -107,12 +92,7 @@ func (a *KVAdapter) writePolicyLine(ptype string, rule []string) error {
 }
 
 // SavePolicy saves policy to consul.
-func (a *KVAdapter) SavePolicy(model model.Model) error {
-	//err := a.init()
-	// if err != nil {
-	// 	log15.Error("Could not initialize KVAdapter", "Error", err)
-	// 	return err
-	// }
+func (a *KVAdapter) SavePolicy(model model.Model) {
 
 	//Loop over the policies
 	for ptype, ast := range model["p"] {
@@ -120,7 +100,7 @@ func (a *KVAdapter) SavePolicy(model model.Model) error {
 			err := a.writePolicyLine(ptype, rule)
 			if err != nil {
 				log15.Error("Error storing policy to consul KV store", "Error", err)
-				return err
+				//return err
 			}
 		}
 	}
@@ -131,9 +111,9 @@ func (a *KVAdapter) SavePolicy(model model.Model) error {
 			err := a.writePolicyLine(ptype, rule)
 			if err != nil {
 				log15.Error("Error storing policy to consul KV store", "Error", err)
-				return err
+				//return err
 			}
 		}
 	}
-	return nil
+	//return nil
 }
