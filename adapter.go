@@ -10,8 +10,7 @@ import (
 	"github.com/inconshreveable/log15"
 )
 
-// KVAdapter represents the database adapter for policy persistence, can load policy from database or save policy to database.
-// For now, only MySQL is tested, but it should work for other RDBMS.
+// KVAdapter represents the consul adapter for policy persistence, can load policy from consul or save policy to consul.
 type KVAdapter struct {
 	kv *api.KV
 }
