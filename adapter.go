@@ -2,7 +2,6 @@ package consuladapter
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,20 +10,21 @@ import (
 	"github.com/inconshreveable/log15"
 )
 
-// DBAdapter represents the database adapter for policy persistence, can load policy from database or save policy to database.
+// KVAdapter represents the database adapter for policy persistence, can load policy from database or save policy to database.
 // For now, only MySQL is tested, but it should work for other RDBMS.
-type DBAdapter struct {
+type KVAdapter struct {
 	kv *api.KV
 }
 
-// NewDBAdapter is the constructor for DBAdapter.
-func NewDBAdapter() *DBAdapter {
-	a := DBAdapter{}
+// NewKVAdapter is the constructor for KVAdapter.
+func NewKVAdapter() *KVAdapter {
+	a := KVAdapter{}
 
 	return &a
 }
 
-func (a *DBAdapter) init() error {
+func (a *KVAdapter) init() error {
+	//Change to handle non-default port, probably have to use viper
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		log15.Error("Could not return consul client", "Error", err)
@@ -35,23 +35,13 @@ func (a *DBAdapter) init() error {
 
 }
 
-//Put function creates a key-value pair in consul
-func (a *DBAdapter) Put(p *api.KVPair) (*api.WriteMeta, error) {
-	return a.kv.Put(p, nil)
-}
-
-//Get Function gets the key value from consul
-func (a *DBAdapter) Get(key string) (*api.KVPair, *api.QueryMeta, error) {
-	return a.kv.Get(key, nil)
-}
-
-//CAS - Check and set function returns true or false if the operation is successful
-func (a *DBAdapter) CAS(kvpair *api.KVPair) (bool, *api.WriteMeta, error) {
+//cas - Check and set function returns true or false if the operation is successful
+func (a *KVAdapter) cas(kvpair *api.KVPair) (bool, *api.WriteMeta, error) {
 	return a.kv.CAS(kvpair, nil)
 }
 
-// List is used to lookup all keys under a prefix
-func (a *DBAdapter) List(prefix string) (api.KVPairs, *api.QueryMeta, error) {
+// list is used to lookup all keys under a prefix
+func (a *KVAdapter) list(prefix string) (api.KVPairs, *api.QueryMeta, error) {
 	return a.kv.List(prefix, nil)
 }
 
@@ -66,13 +56,13 @@ func loadPolicyLine(line string, model model.Model) {
 }
 
 // LoadPolicy loads policy from consul.
-func (a *DBAdapter) LoadPolicy(model model.Model) error {
-	err := a.init()
-	if err != nil {
-		log15.Error("Could not initialize DBAdapter", "Error", err)
-		return err
-	}
-	pairs, _, err := a.List("")
+func (a *KVAdapter) LoadPolicy(model model.Model) error {
+	// err := a.init()
+	// if err != nil {
+	// 	log15.Error("Could not initialize KVAdapter", "Error", err)
+	// 	return err
+	// }
+	pairs, _, err := a.list("rp")
 	if err != nil {
 		log15.Error("Could not retreive list of key-value pairs", "Error", err)
 		return err
@@ -83,12 +73,12 @@ func (a *DBAdapter) LoadPolicy(model model.Model) error {
 	}
 
 	if err != nil {
-		fmt.Println("List error API: ", err)
+
 	}
 	return nil
 }
 
-func (a *DBAdapter) writePolicyLine(ptype string, rule []string) error {
+func (a *KVAdapter) writePolicyLine(ptype string, rule []string) error {
 	line := ptype
 
 	for i := range rule {
@@ -97,13 +87,13 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string) error {
 	// for i := 0; i < 4-len(rule); i++ {
 	// 	line += ","
 	// }
-	_, meta, err := a.List("")
+	_, meta, err := a.list("rp")
 	if err != nil {
 		log15.Error("Could not retrieve key-value pair", "Error", err)
 		return err
 	}
 	p := &api.KVPair{Key: ptype + strconv.FormatUint(meta.LastIndex, 10), Value: []byte(line)}
-	if success, _, err := a.CAS(p); success {
+	if success, _, err := a.cas(p); success {
 		if err != nil {
 			log15.Error("Check and Set failed for Consul KV", "Error", err)
 			return err
@@ -117,17 +107,17 @@ func (a *DBAdapter) writePolicyLine(ptype string, rule []string) error {
 }
 
 // SavePolicy saves policy to consul.
-func (a *DBAdapter) SavePolicy(model model.Model) error {
-	err := a.init()
-	if err != nil {
-		log15.Error("Could not initialize DBAdapter", "Error", err)
-		return err
-	}
+func (a *KVAdapter) SavePolicy(model model.Model) error {
+	//err := a.init()
+	// if err != nil {
+	// 	log15.Error("Could not initialize KVAdapter", "Error", err)
+	// 	return err
+	// }
 
 	//Loop over the policies
 	for ptype, ast := range model["p"] {
 		for _, rule := range ast.Policy {
-			err = a.writePolicyLine(ptype, rule)
+			err := a.writePolicyLine(ptype, rule)
 			if err != nil {
 				log15.Error("Error storing policy to consul KV store", "Error", err)
 				return err
@@ -138,7 +128,7 @@ func (a *DBAdapter) SavePolicy(model model.Model) error {
 	//Loop over group to role mapping
 	for ptype, ast := range model["g"] {
 		for _, rule := range ast.Policy {
-			err = a.writePolicyLine(ptype, rule)
+			err := a.writePolicyLine(ptype, rule)
 			if err != nil {
 				log15.Error("Error storing policy to consul KV store", "Error", err)
 				return err
