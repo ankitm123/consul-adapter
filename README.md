@@ -7,7 +7,7 @@ package main
 
 import (
 	"github.com/casbin/casbin"
-	"github.com/ankitm123/consul_adapter"
+	"github.com/ankitm123/consul-adapter"
 )
 
 func main() {
