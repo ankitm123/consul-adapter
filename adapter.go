@@ -22,16 +22,6 @@ func NewKVAdapter(kv *api.KV) *KVAdapter {
 	return &a
 }
 
-//cas - Check and set function returns true or false if the operation is successful
-func (a *KVAdapter) cas(kvpair *api.KVPair) (bool, *api.WriteMeta, error) {
-	return a.kv.CAS(kvpair, nil)
-}
-
-// list is used to lookup all keys under a prefix
-func (a *KVAdapter) list(prefix string) (api.KVPairs, *api.QueryMeta, error) {
-	return a.kv.List(prefix, nil)
-}
-
 func loadPolicyKey(line string, model model.Model) {
 	if line == "" {
 		return
@@ -47,9 +37,7 @@ func loadPolicyKey(line string, model model.Model) {
 // LoadPolicy loads policy from consul.
 func (a *KVAdapter) LoadPolicy(model model.Model) error {
 	line := [][]string{}
-	//rule := ""
 
-	//TODO: Write a get function
 	pair, _, err := a.kv.Get("rp", nil)
 	if err != nil {
 		return err
@@ -89,7 +77,7 @@ func (a *KVAdapter) writePolicyKey(rule [][]string) error {
 		p.ModifyIndex = pair.ModifyIndex
 	}
 
-	if success, _, err := a.cas(p); success {
+	if success, _, err := a.kv.CAS(p,nil); success {
 		if err != nil {
 			return err
 		}
@@ -105,17 +93,16 @@ func (a *KVAdapter) SavePolicy(model model.Model) error {
 
 	var rule [][]string
 	if len(model["p"]["p"].Policy) != 0 {
-
 		rule = append(model["p"]["p"].Policy, rule...)
-		a.writePolicyKey(rule)
+
 	}
 	if len(model["g"]["g"].Policy) != 0 {
-
 		rule = append(model["g"]["g"].Policy, rule...)
-		a.writePolicyKey(rule)
 	}
-	if len(rule) == 0 {
-		return errors.New("Invalid policy (policy cannot be empty)")
+
+	err := a.writePolicyKey(rule)
+	if err != nil {
+		return err
 	}
 
 	return nil
