@@ -46,9 +46,9 @@ func TestAdapter(t *testing.T) {
 }
 
 func TestBadPort(t *testing.T) {
-	e := casbin.NewEnforcer("../rbac_model.conf", "../rbac_policy.csv")
 	a, _ := NewKVAdapter("127.0.0.1:9800")
-	err := a.SavePolicy(e.GetModel())
+	e := casbin.NewEnforcer("../rbac_model.conf", a)
+	err := e.LoadPolicy()
 	if err == nil {
 		t.Fatalf("err: %v", err)
 	}
